@@ -51,3 +51,12 @@ ls -lh \
   build/proto/proto_bench \
   build/pony/pony_bench \
   build/caf/caf_bench
+
+# Catch packaging/runtime startup failures before the measured campaign.
+echo '== Runtime smoke =='
+"$FUWAROID_BIN" tell messages=1000 warmup=0 note=smoke >/dev/null
+erl -noshell -pa build/erlang -eval 'bench:main(1000), halt().'
+java -Xms128m -Xmx512m -jar build/akka/akka-bench.jar 1000
+MESSAGES=1000 build/caf/caf_bench
+build/pony/pony_bench 1000
+build/proto/proto_bench 1000
