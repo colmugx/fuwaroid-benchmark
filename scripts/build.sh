@@ -27,7 +27,10 @@ cp benchmarks/akka/target/akka-bench.jar build/akka/akka-bench.jar
 echo '== Proto.Actor Go =='
 (
   cd benchmarks/protoactor
-  go mod download
+  # Upstream's public 0.4.0 release tag omits the Go-semver `v` prefix,
+  # so pin the exact release commit instead of using the unresolvable v0.4.0.
+  go get github.com/asynkron/protoactor-go@49001705a0fefbae5c4ffd0acb8ed39be3eb5292
+  go mod tidy
   go build -trimpath -ldflags='-s -w' -o "$ROOT/build/proto/proto_bench" .
 )
 
