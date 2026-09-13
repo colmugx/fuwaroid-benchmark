@@ -41,7 +41,7 @@ func main() {
 	pid := root.Spawn(actor.PropsFromProducer(func() actor.Actor { return &counter{} }))
 	msg := tick{}
 	for i := int64(0); i < n; i++ {
-		root.Tell(pid, msg)
+		root.Send(pid, msg)
 	}
 
 	future := root.RequestFuture(pid, barrier{}, 60*time.Second)
