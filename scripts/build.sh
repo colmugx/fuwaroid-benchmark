@@ -32,7 +32,8 @@ echo '== Proto.Actor Go =='
 )
 
 echo '== Pony =='
-ponyc --release -b pony_bench -o "$ROOT/build/pony" benchmarks/pony
+# ponyc's normal build is optimized; --debug is the opt-out.
+ponyc -b pony_bench -o "$ROOT/build/pony" benchmarks/pony
 
 echo '== CAF =='
 cmake -S benchmarks/caf -B build/caf-src -G Ninja -DCMAKE_BUILD_TYPE=Release
