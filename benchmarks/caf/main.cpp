@@ -3,17 +3,15 @@
 #include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
-
-using work_atom = caf::atom_constant<caf::atom("work")>;
-using barrier_atom = caf::atom_constant<caf::atom("barrier")>;
+#include <string>
 
 caf::behavior counter(caf::event_based_actor* self) {
   auto count = std::make_shared<std::uint64_t>(0);
   return {
-    [count](work_atom) {
+    [count](std::uint8_t) {
       ++(*count);
     },
-    [self, count](barrier_atom) -> std::uint64_t {
+    [self, count](const std::string&) -> std::uint64_t {
       auto result = *count;
       self->quit();
       return result;
@@ -27,11 +25,11 @@ void caf_main(caf::actor_system& sys) {
 
   auto worker = sys.spawn(counter);
   for (std::uint64_t i = 0; i < n; ++i)
-    caf::anon_mail(work_atom_v).send(worker);
+    caf::anon_mail(std::uint8_t{1}).send(worker);
 
   caf::scoped_actor self{sys};
   std::uint64_t got = 0;
-  self->mail(barrier_atom_v)
+  self->mail(std::string{"barrier"})
     .request(worker, caf::infinite)
     .receive(
       [&](std::uint64_t value) { got = value; },
