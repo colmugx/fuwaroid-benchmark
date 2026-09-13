@@ -1,0 +1,117 @@
+name: Cross-runtime actor benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      messages:
+        description: Messages per measured process
+        required: true
+        default: '5000000'
+      runs:
+        description: Hyperfine measured runs
+        required: true
+        default: '10'
+      warmup:
+        description: Hyperfine whole-process warm-up runs
+        required: true
+        default: '3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actor-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MoonBit
+        uses: hustcer/setup-moonbit@v1.22
+        with:
+          version: '0.10.12+1634b282e'
+          core-version: '0.10.12+1634b282e'
+
+      - name: Set up Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '29.0.6'
+          version-type: strict
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: benchmarks/akka/pom.xml
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+          cache-dependency-path: benchmarks/protoactor/go.sum
+
+      - name: Install native benchmark dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ libc6-dev lsb-release curl hyperfine maven
+
+      - name: Install Pony release toolchain
+        shell: bash
+        run: |
+          export SHELL=/bin/bash
+          sh -c "$(curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/ponylang/ponyup/latest-release/ponyup-init.sh)"
+          echo "$HOME/.local/share/ponyup/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/ponyup/bin/ponyup" update ponyc release --retries 3
+
+      - name: Build all implementations
+        shell: bash
+        run: bash scripts/build.sh
+
+      - name: Capture environment
+        shell: bash
+        run: bash scripts/environment.sh
+
+      - name: Run benchmark
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MESSAGES: ${{ inputs.messages }}
+          INPUT_RUNS: ${{ inputs.runs }}
+          INPUT_WARMUP: ${{ inputs.warmup }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            export MESSAGES=250000
+            export RUNS=2
+            export WARMUP=1
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            export MESSAGES="$INPUT_MESSAGES"
+            export RUNS="$INPUT_RUNS"
+            export WARMUP="$INPUT_WARMUP"
+          else
+            export MESSAGES=5000000
+            export RUNS=10
+            export WARMUP=3
+          fi
+          bash scripts/run.sh
+          cat results/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw data and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: actor-benchmark-${{ github.sha }}-${{ github.run_attempt }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 90
