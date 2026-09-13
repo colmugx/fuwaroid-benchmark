@@ -58,8 +58,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
-          cache: true
-          cache-dependency-path: benchmarks/protoactor/go.sum
+          cache: false
 
       - name: Install native benchmark dependencies
         run: |
